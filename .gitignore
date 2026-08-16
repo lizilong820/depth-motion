@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+data/jobs/*
+!data/jobs/.gitkeep
+.huggingface/
+model/
+backups/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log

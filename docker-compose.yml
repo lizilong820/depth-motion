@@ -1,0 +1,15 @@
+services:
+  depth-studio:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATA_DIR: /app/data
+      MAX_UPLOAD_MB: 500
+      DEPTH_MODEL_ID: depth-anything/Depth-Anything-V2-Small-hf
+    volumes:
+      - depth-data:/app/data
+
+volumes:
+  depth-data:

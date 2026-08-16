@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DEPTH / 动作深度视频转换器</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101110;
+      --panel: #191b19;
+      --panel-2: #222522;
+      --line: #383d38;
+      --muted: #969d96;
+      --text: #f3f5f1;
+      --accent: #d8ff3e;
+      --danger: #ff6b57;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); }
+    body { min-height: 100dvh; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .app { min-height: 100dvh; display: grid; grid-template-rows: 58px 1fr 34px; }
+    .topbar { display: grid; grid-template-columns: 290px 1fr auto; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid var(--line); background: rgba(16,17,16,.96); }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; background: var(--accent); color: #11130d; border-radius: 3px; font-weight: 900; font-size: 12px; }
+    .brand-copy strong { display: block; font-size: 13px; letter-spacing: .08em; }
+    .brand-copy span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .project-name { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .privacy { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+    .privacy svg { width: 15px; color: var(--accent); }
+    .workspace { min-height: 0; display: grid; grid-template-columns: 300px minmax(0,1fr); }
+    .sidebar { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 16px; }
+    .section + .section { margin-top: 22px; padding-top: 19px; border-top: 1px solid var(--line); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-head h2 { margin: 0; color: var(--muted); font-size: 11px; letter-spacing: .11em; text-transform: uppercase; }
+    .section-head output { color: var(--accent); font-size: 11px; }
+    .dropzone { min-height: 140px; display: grid; place-items: center; padding: 18px; border: 1px dashed #4b514b; border-radius: var(--radius); background: #141614; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+    .dropzone:hover, .dropzone.dragging { border-color: var(--accent); background: #1c2018; }
+    .dropzone svg { width: 28px; height: 28px; color: var(--accent); margin-bottom: 9px; }
+    .dropzone strong { display: block; font-size: 13px; }
+    .dropzone span { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    #fileInput { display: none; }
+    .source-mode { margin-bottom: 10px; }
+    .url-source { display: none; }
+    .url-source.visible { display: block; }
+    .url-input { width: 100%; min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius); background: #141614; color: var(--text); font-size: 12px; }
+    .url-input::placeholder { color: #6f766f; }
+    .url-input:focus { border-color: var(--accent); }
+    .file-source.hidden { display: none; }
+    .file-info { display: none; gap: 10px; align-items: center; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+    .file-info.visible { display: flex; }
+    .file-icon { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 4px; background: #111311; color: var(--accent); }
+    .file-icon svg { width: 17px; }
+    .file-copy { min-width: 0; flex: 1; }
+    .file-copy strong, .file-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-copy strong { font-size: 12px; }
+    .file-copy span { margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .segment { min-height: 43px; border: 1px solid var(--line); border-radius: 4px; background: #141614; color: var(--muted); cursor: pointer; font-size: 11px; }
+    .segment.active { border-color: var(--accent); background: var(--accent); color: #11130d; font-weight: 750; }
+    .control { margin-top: 18px; }
+    .control label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; font-size: 12px; }
+    .control label span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; height: 20px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
+    input[type="range"]::-webkit-slider-runnable-track { height: 3px; background: linear-gradient(90deg,var(--accent) var(--fill,25%),#454a45 var(--fill,25%)); }
+    input[type="range"]::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -6px; appearance: none; border: 2px solid #111; border-radius: 50%; background: #fff; }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); cursor: pointer; transition: background .15s, border-color .15s, transform .12s; }
+    .btn:hover { background: #2b2f2b; border-color: #545b54; }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+    .btn.primary { width: 100%; background: var(--accent); border-color: var(--accent); color: #11130d; font-weight: 780; }
+    .btn.primary:hover { background: #e5ff76; }
+    .btn svg { width: 17px; height: 17px; }
+    .history-list { display: grid; gap: 7px; }
+    .history-empty { margin: 0; padding: 12px 0 2px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .history-item { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #141614; text-align: left; cursor: pointer; transition: background .15s, border-color .15s, transform .12s; }
+    .history-item:hover { background: var(--panel-2); border-color: #545b54; }
+    .history-item:active { transform: scale(.98); }
+    .history-item.active { border-color: var(--accent); }
+    .history-copy { min-width: 0; }
+    .history-copy strong, .history-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-copy strong { font-size: 11px; }
+    .history-copy span { margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .history-state { color: var(--muted); font-size: 9px; text-transform: uppercase; white-space: nowrap; }
+    .history-state.completed { color: var(--accent); }
+    .history-state.failed { color: var(--danger); }
+    .tech-list { margin: 0; padding: 0; list-style: none; }
+    .tech-list li { display: flex; justify-content: space-between; gap: 12px; min-height: 32px; align-items: center; border-bottom: 1px solid #2b2f2b; font-size: 11px; }
+    .tech-list li:last-child { border-bottom: 0; }
+    .tech-list span { color: var(--muted); }
+    .stage { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(460px,1fr) auto; background-color: #0c0d0c; background-image: linear-gradient(#181a18 1px,transparent 1px),linear-gradient(90deg,#181a18 1px,transparent 1px); background-size: 24px 24px; }
+    .viewer-wrap { min-height: 0; display: grid; place-items: center; padding: 28px; overflow: hidden; }
+    .viewer-shell { width: min(100%,1180px); }
+    .viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; color: var(--muted); font-size: 10px; }
+    .viewer-head strong { color: var(--text); font-size: 11px; }
+    .viewer { position: relative; width: 100%; aspect-ratio: 16/9; border: 1px solid #2e322e; background: #080908; box-shadow: 0 28px 80px rgba(0,0,0,.36); overflow: hidden; }
+    .viewer video { width: 100%; height: 100%; display: block; object-fit: contain; background: #080908; }
+    .empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 28px; text-align: center; }
+    .empty.hidden { display: none; }
+    .depth-graphic { width: min(440px,80%); height: 120px; margin: 0 auto 22px; position: relative; }
+    .depth-graphic::before, .depth-graphic::after { content: ""; position: absolute; inset: 18px 20%; border: 1px solid #444a44; transform: perspective(300px) rotateX(58deg) rotateZ(-8deg); }
+    .depth-graphic::after { inset: 38px 29%; border-color: var(--accent); }
+    .scan { position: absolute; left: 10%; right: 10%; top: 50%; height: 1px; background: var(--accent); box-shadow: 0 0 14px rgba(216,255,62,.4); animation: scan 2.8s infinite ease-in-out; }
+    .empty strong { display: block; font-size: 18px; }
+    .empty span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .processing { position: absolute; inset: 0; display: none; place-items: center; padding: 30px; background: rgba(8,9,8,.9); text-align: center; }
+    .processing.visible { display: grid; }
+    .processor { width: min(520px,90%); }
+    .processor h3 { margin: 0; font-size: 18px; }
+    .processor p { min-height: 20px; margin: 8px 0 20px; color: var(--muted); font-size: 12px; }
+    .progress-track { height: 8px; overflow: hidden; border-radius: 2px; background: #303430; }
+    .progress-fill { width: 0; height: 100%; background: var(--accent); transition: width .3s ease; }
+    .progress-meta { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .compare { display: none; width: 100%; height: 100%; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+    .compare.visible { display: grid; }
+    .compare-pane { min-width: 0; position: relative; background: #080908; }
+    .pane-label { position: absolute; top: 10px; left: 10px; z-index: 2; padding: 5px 7px; border-radius: 3px; background: rgba(16,17,16,.82); color: var(--muted); font-size: 10px; }
+    .compare-pane:last-child .pane-label { background: var(--accent); color: #11130d; font-weight: 700; }
+    .resultbar { display: none; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px 16px; border-top: 1px solid var(--line); background: var(--panel); }
+    .resultbar.visible { display: flex; }
+    .result-copy strong, .result-copy span { display: block; }
+    .result-copy strong { font-size: 12px; }
+    .result-copy span { margin-top: 4px; color: var(--muted); font-size: 10px; }
+    .statusbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 14px; border-top: 1px solid var(--line); background: #111211; color: var(--muted); font-size: 10px; }
+    .status { display: flex; align-items: center; gap: 7px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .dot.busy { animation: pulse 1s infinite ease-in-out; }
+    .dot.error { background: var(--danger); }
+    .toast { position: fixed; right: 18px; bottom: 48px; z-index: 20; max-width: min(380px,calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #4a504a; border-radius: var(--radius); background: var(--panel-2); box-shadow: 0 16px 44px rgba(0,0,0,.35); font-size: 12px; opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .2s, transform .2s; }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    .toast.error { border-color: var(--danger); }
+    @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+    @keyframes scan { 0%,100% { transform: translateY(-42px); opacity: .35; } 50% { transform: translateY(42px); opacity: 1; } }
+    @media (max-width:820px) {
+      .app { grid-template-rows:56px auto 34px; }
+      .topbar { grid-template-columns:1fr auto; padding:0 12px; }
+      .project-name { display:none; }
+      .privacy span { display:none; }
+      .workspace { display:flex; flex-direction:column-reverse; }
+      .sidebar { border-right:0; border-top:1px solid var(--line); padding:16px 14px calc(20px + env(safe-area-inset-bottom)); overflow:visible; }
+      .stage { grid-template-rows:auto auto; }
+      .viewer-wrap { min-height:280px; padding:14px; }
+      .compare { grid-template-columns:1fr; overflow:auto; }
+      .compare-pane { min-height:220px; }
+      .resultbar { align-items:flex-start; flex-direction:column; }
+      .resultbar .btn { width:100%; }
+      .statusbar span:last-child { display:none; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">D/</div>
+        <div class="brand-copy"><strong>DEPTH MOTION</strong><span>动作深度视频转换器</span></div>
+      </div>
+      <div class="project-name" id="projectName">未载入动作视频</div>
+      <div class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+        <span>服务器本地处理</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="section">
+          <div class="section-head"><h2>01 / 动作素材</h2></div>
+          <div class="segmented source-mode" role="group" aria-label="素材来源">
+            <button class="segment source-tab active" data-source="file">本地文件</button>
+            <button class="segment source-tab" data-source="url">视频链接</button>
+          </div>
+          <div class="file-source" id="fileSource">
+            <label class="dropzone" id="dropzone" for="fileInput">
+              <div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>
+                <strong>选择或拖入视频</strong>
+                <span>MP4 / MOV / WebM，最大 500 MB</span>
+              </div>
+            </label>
+            <input id="fileInput" type="file" accept="video/*">
+          </div>
+          <div class="url-source" id="urlSource">
+            <input class="url-input" id="videoUrl" type="url" inputmode="url" maxlength="2048" autocomplete="off" placeholder="粘贴抖音、B站、YouTube 页面或视频直链" aria-label="视频链接">
+            <p class="hint">支持抖音、B站公开页面和 HTTP/HTTPS 文件直链。YouTube 取决于服务器网络；登录、会员、私密或地区受限内容无法处理。</p>
+          </div>
+          <div class="file-info" id="fileInfo">
+            <div class="file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 10l4.6-2.3a1 1 0 0 1 1.4.9v6.8a1 1 0 0 1-1.4.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg></div>
+            <div class="file-copy"><strong id="fileName"></strong><span id="fileMeta"></span></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>02 / 深度参数</h2></div>
+          <div class="segmented" role="group" aria-label="深度方向">
+            <button class="segment active" data-invert="false">白近 · 黑远</button>
+            <button class="segment" data-invert="true">黑近 · 白远</button>
+          </div>
+          <div class="control">
+            <label for="smoothing"><span>时序稳定度</span><span id="smoothingValue">25%</span></label>
+            <input id="smoothing" type="range" min="0" max="70" value="25">
+          </div>
+          <p class="hint">稳定度越高，灰阶闪烁越少，但快速动作边缘会稍有拖尾。动作控制建议 20%–35%。</p>
+        </section>
+
+        <section class="section">
+          <button class="btn primary" id="generateBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3-1.9 5.1L5 10l5.1 1.9L12 17l1.9-5.1L19 10l-5.1-1.9z"/><path d="m5 16-.8 2.2L2 19l2.2.8L5 22l.8-2.2L8 19l-2.2-.8z"/></svg>
+            生成动作深度视频
+          </button>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>03 / 最近生成</h2><output id="historyCount">0</output></div>
+          <div class="history-list" id="historyList" aria-live="polite">
+            <p class="history-empty">当前浏览器还没有生成记录。</p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>处理规格</h2></div>
+          <ul class="tech-list">
+            <li><span>深度模型</span><strong>Depth Anything V2</strong></li>
+            <li><span>输出格式</span><strong>灰度 MP4</strong></li>
+            <li><span>尺寸 / 帧率</span><strong>跟随原片</strong></li>
+            <li><span>音频</span><strong>自动保留</strong></li>
+          </ul>
+        </section>
+      </aside>
+
+      <section class="stage" aria-label="深度视频工作区">
+        <div class="viewer-wrap">
+          <div class="viewer-shell">
+            <div class="viewer-head"><strong id="viewerTitle">动作视频预览</strong><span id="viewerMeta">DEPTH MAP / READY</span></div>
+            <div class="viewer" id="viewer">
+              <video id="sourceVideo" controls playsinline preload="metadata"></video>
+              <div class="empty" id="emptyState">
+                <div>
+                  <div class="depth-graphic"><i class="scan"></i></div>
+                  <strong>从动作视频提取空间深度</strong>
+                  <span>输出白近黑远的灰度视频，供 AI 视频节点控制动作</span>
+                </div>
+              </div>
+              <div class="processing" id="processing">
+                <div class="processor">
+                  <h3>正在构建深度序列</h3>
+                  <p id="progressMessage">等待模型响应</p>
+                  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                  <div class="progress-meta"><span id="progressStage">QUEUED</span><span id="progressPercent">0%</span></div>
+                </div>
+              </div>
+              <div class="compare" id="compareView">
+                <div class="compare-pane"><span class="pane-label">原动作</span><video id="originalResult" controls playsinline></video></div>
+                <div class="compare-pane"><span class="pane-label">深度控制</span><video id="depthResult" controls playsinline></video></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="resultbar" id="resultbar">
+          <div class="result-copy"><strong>深度视频已生成</strong><span id="resultMeta">可直接作为 AI 视频工作流的动作控制输入</span></div>
+          <a class="btn" id="downloadBtn" href="#" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            下载深度 MP4
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <footer class="statusbar">
+      <div class="status"><i class="dot" id="statusDot"></i><span id="statusText">服务就绪</span></div>
+      <span>首次任务需下载模型，等待时间会更长</span>
+    </footer>
+  </main>
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const els = {
+        fileInput: $('fileInput'), dropzone: $('dropzone'), fileInfo: $('fileInfo'), fileName: $('fileName'), fileMeta: $('fileMeta'),
+        fileSource: $('fileSource'), urlSource: $('urlSource'), videoUrl: $('videoUrl'),
+        sourceVideo: $('sourceVideo'), empty: $('emptyState'), projectName: $('projectName'), smoothing: $('smoothing'), smoothingValue: $('smoothingValue'),
+        generate: $('generateBtn'), processing: $('processing'), progressMessage: $('progressMessage'), progressFill: $('progressFill'), progressStage: $('progressStage'), progressPercent: $('progressPercent'),
+        compare: $('compareView'), originalResult: $('originalResult'), depthResult: $('depthResult'), resultbar: $('resultbar'), resultMeta: $('resultMeta'), download: $('downloadBtn'),
+        viewerTitle: $('viewerTitle'), viewerMeta: $('viewerMeta'), statusText: $('statusText'), statusDot: $('statusDot'), toast: $('toast'),
+        historyList: $('historyList'), historyCount: $('historyCount')
+      };
+      const HISTORY_KEY = 'depth-motion.jobs.v1';
+      const MAX_HISTORY = 8;
+      let file = null;
+      let sourceUrl = '';
+      let sourceMode = 'file';
+      let invert = false;
+      let pollTimer = 0;
+      let toastTimer = 0;
+      let jobInFlight = false;
+      let activeJobId = '';
+      let localSourceJobId = '';
+      let history = loadHistory();
+
+      function formatBytes(bytes) {
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+      }
+      function loadHistory() {
+        try {
+          const stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+          return Array.isArray(stored) ? stored.filter((item) => item && typeof item.id === 'string').slice(0, MAX_HISTORY) : [];
+        } catch (_) {
+          return [];
+        }
+      }
+      function saveHistory() {
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        } catch (_) {}
+      }
+      function rememberJob(job) {
+        const existing = history.find((item) => item.id === job.id) || {};
+        const snapshot = { ...existing, ...job };
+        history = [snapshot, ...history.filter((item) => item.id !== job.id)]
+          .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+          .slice(0, MAX_HISTORY);
+        saveHistory();
+        renderHistory();
+      }
+      function forgetJob(jobId) {
+        history = history.filter((item) => item.id !== jobId);
+        saveHistory();
+        renderHistory();
+      }
+      function historyStatus(job) {
+        const labels = {
+          queued: '排队中', downloading: '下载中', loading_model: '加载模型', processing: `${job.progress || 0}%`,
+          encoding: '编码中', completed: '已完成', failed: '失败'
+        };
+        return labels[job.status] || '检查中';
+      }
+      function formatCreatedAt(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
+      }
+      function renderHistory() {
+        els.historyList.replaceChildren();
+        els.historyCount.textContent = String(history.length);
+        if (!history.length) {
+          const empty = document.createElement('p');
+          empty.className = 'history-empty';
+          empty.textContent = '当前浏览器还没有生成记录。';
+          els.historyList.append(empty);
+          return;
+        }
+        history.forEach((job) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `history-item${job.id === activeJobId ? ' active' : ''}`;
+          button.setAttribute('aria-label', `打开任务 ${job.filename || job.id}`);
+          const copy = document.createElement('span');
+          copy.className = 'history-copy';
+          const name = document.createElement('strong');
+          name.textContent = job.filename || '未命名视频';
+          const detail = document.createElement('span');
+          detail.textContent = [formatCreatedAt(job.created_at), job.message].filter(Boolean).join(' · ');
+          const state = document.createElement('span');
+          state.className = `history-state ${job.status || ''}`;
+          state.textContent = historyStatus(job);
+          copy.append(name, detail);
+          button.append(copy, state);
+          button.addEventListener('click', () => {
+            if (jobInFlight && job.id !== activeJobId) return toast('当前任务处理中，请等待完成后再切换记录。', true);
+            openJob(job.id);
+          });
+          els.historyList.append(button);
+        });
+      }
+      function canGenerate() {
+        return sourceMode === 'file' ? Boolean(file) : Boolean(els.videoUrl.value.trim());
+      }
+      function updateGenerateAvailability() {
+        els.generate.disabled = jobInFlight || !canGenerate();
+      }
+      function setStatus(text, state = 'ready') {
+        els.statusText.textContent = text;
+        els.statusDot.className = `dot${state === 'busy' ? ' busy' : ''}${state === 'error' ? ' error' : ''}`;
+      }
+      function toast(message, error = false) {
+        clearTimeout(toastTimer);
+        els.toast.textContent = message;
+        els.toast.classList.toggle('error', error);
+        els.toast.classList.add('visible');
+        toastTimer = setTimeout(() => els.toast.classList.remove('visible'), 3400);
+      }
+      function updateSlider() {
+        const percent = Number(els.smoothing.value);
+        els.smoothingValue.textContent = `${percent}%`;
+        els.smoothing.style.setProperty('--fill', `${(percent / 70) * 100}%`);
+      }
+      function resetResult() {
+        clearTimeout(pollTimer);
+        els.processing.classList.remove('visible');
+        els.compare.classList.remove('visible');
+        els.resultbar.classList.remove('visible');
+        els.sourceVideo.style.display = 'block';
+        els.viewerTitle.textContent = '动作视频预览';
+        els.viewerMeta.textContent = 'DEPTH MAP / READY';
+      }
+      function loadFile(selected) {
+        if (jobInFlight) return toast('当前任务处理中，请等待完成后再更换素材。', true);
+        if (!selected || !selected.type.startsWith('video/')) return toast('请选择有效的视频文件。', true);
+        if (selected.size > 500 * 1024 * 1024) return toast('视频不能超过 500 MB。', true);
+        file = selected;
+        resetResult();
+        if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+        sourceUrl = URL.createObjectURL(file);
+        els.sourceVideo.src = sourceUrl;
+        els.sourceVideo.load();
+        els.empty.classList.add('hidden');
+        els.fileInfo.classList.add('visible');
+        els.fileName.textContent = file.name;
+        els.fileMeta.textContent = `${formatBytes(file.size)} · 正在读取`;
+        els.projectName.textContent = file.name;
+        els.generate.disabled = false;
+        setStatus('素材已载入');
+      }
+      async function readError(response) {
+        const body = await response.json().catch(() => null);
+        return body?.message || `请求失败（${response.status}）`;
+      }
+      async function generate() {
+        const remoteUrl = els.videoUrl.value.trim();
+        if (sourceMode === 'file' && !file) return;
+        if (sourceMode === 'url' && !remoteUrl) return toast('请输入公开视频页面或文件直链。', true);
+        jobInFlight = true;
+        updateGenerateAvailability();
+        els.sourceVideo.pause();
+        els.processing.classList.add('visible');
+        els.progressFill.style.width = '1%';
+        els.progressPercent.textContent = '1%';
+        els.progressMessage.textContent = sourceMode === 'file' ? '正在上传动作视频' : '正在创建远程下载任务';
+        els.progressStage.textContent = sourceMode === 'file' ? 'UPLOADING' : 'REMOTE';
+        setStatus(sourceMode === 'file' ? '正在上传并创建任务' : '正在提交视频链接', 'busy');
+        try {
+          let response;
+          if (sourceMode === 'file') {
+            const form = new FormData();
+            form.append('file', file);
+            form.append('invert', String(invert));
+            form.append('temporal_smoothing', String(Number(els.smoothing.value) / 100));
+            response = await fetch('/api/jobs', { method: 'POST', body: form });
+          } else {
+            response = await fetch('/api/jobs/remote', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: remoteUrl,
+                invert,
+                temporal_smoothing: Number(els.smoothing.value) / 100
+              })
+            });
+          }
+          if (!response.ok) throw new Error(await readError(response));
+          const job = await response.json();
+          activeJobId = job.id;
+          localSourceJobId = sourceMode === 'file' ? job.id : '';
+          rememberJob(job);
+          poll(job.id);
+        } catch (error) {
+          fail(error.message);
+        }
+      }
+      async function openJob(jobId, restoring = false) {
+        clearTimeout(pollTimer);
+        activeJobId = jobId;
+        jobInFlight = true;
+        renderHistory();
+        els.processing.classList.add('visible');
+        els.compare.classList.remove('visible');
+        els.resultbar.classList.remove('visible');
+        els.sourceVideo.style.display = 'none';
+        els.progressFill.style.width = '1%';
+        els.progressPercent.textContent = '1%';
+        els.progressMessage.textContent = restoring ? '正在恢复上次任务' : '正在读取任务状态';
+        els.progressStage.textContent = 'RESTORING';
+        setStatus(restoring ? '正在恢复处理进度' : '正在读取任务状态', 'busy');
+        await poll(jobId, restoring);
+      }
+      async function poll(jobId, restoring = false) {
+        try {
+          const response = await fetch(`/api/jobs/${jobId}`, { cache: 'no-store' });
+          if (response.status === 404) {
+            forgetJob(jobId);
+            if (activeJobId === jobId) activeJobId = '';
+            throw new Error('这条生成记录已过期或被清理。');
+          }
+          if (!response.ok) throw new Error(await readError(response));
+          const job = await response.json();
+          rememberJob(job);
+          const percent = Math.max(1, job.progress || 0);
+          els.progressFill.style.width = `${percent}%`;
+          els.progressPercent.textContent = `${percent}%`;
+          els.progressMessage.textContent = job.message;
+          els.progressStage.textContent = job.status.toUpperCase();
+          setStatus(job.message, 'busy');
+          if (job.status === 'completed') return complete(job, restoring);
+          if (job.status === 'failed') return fail(job.error || '深度视频生成失败', job);
+          pollTimer = setTimeout(() => poll(jobId, false), 1200);
+        } catch (error) {
+          fail(error.message);
+        }
+      }
+      function complete(job, restoring = false) {
+        clearTimeout(pollTimer);
+        jobInFlight = false;
+        rememberJob(job);
+        els.processing.classList.remove('visible');
+        els.sourceVideo.style.display = 'none';
+        els.originalResult.src = sourceUrl && localSourceJobId === job.id ? sourceUrl : job.source_url;
+        els.depthResult.src = `${job.preview_url}?v=${Date.now()}`;
+        els.compare.classList.add('visible');
+        els.resultbar.classList.add('visible');
+        els.download.href = job.download_url;
+        const meta = job.metadata || {};
+        els.resultMeta.textContent = `${meta.width || '-'} × ${meta.height || '-'} · ${meta.fps || '-'} FPS · ${meta.frames || '-'} 帧 · ${String(meta.device || 'CPU').toUpperCase()}`;
+        els.viewerTitle.textContent = '结果对比';
+        els.viewerMeta.textContent = 'ORIGINAL / DEPTH';
+        els.projectName.textContent = job.filename || '已恢复生成任务';
+        updateGenerateAvailability();
+        setStatus(restoring ? '已恢复最近生成结果' : '深度视频已生成');
+        if (!restoring) toast('处理完成，可以预览并下载深度视频。');
+        syncVideos();
+      }
+      function fail(message, job = null) {
+        clearTimeout(pollTimer);
+        jobInFlight = false;
+        if (job) rememberJob(job);
+        els.processing.classList.remove('visible');
+        updateGenerateAvailability();
+        setStatus('处理失败', 'error');
+        toast(message || '处理失败，请重试。', true);
+      }
+      function syncVideos() {
+        const primary = els.originalResult;
+        const secondary = els.depthResult;
+        primary.onplay = () => { if (secondary.paused) secondary.play().catch(() => {}); };
+        primary.onpause = () => secondary.pause();
+        primary.onseeking = () => { if (Math.abs(secondary.currentTime - primary.currentTime) > .12) secondary.currentTime = primary.currentTime; };
+        secondary.onplay = () => { if (primary.paused) primary.play().catch(() => {}); };
+        secondary.onpause = () => primary.pause();
+        secondary.onseeking = () => { if (Math.abs(primary.currentTime - secondary.currentTime) > .12) primary.currentTime = secondary.currentTime; };
+      }
+
+      els.fileInput.addEventListener('change', (event) => loadFile(event.target.files[0]));
+      ['dragenter','dragover'].forEach((type) => els.dropzone.addEventListener(type, (event) => { event.preventDefault(); els.dropzone.classList.add('dragging'); }));
+      ['dragleave','drop'].forEach((type) => els.dropzone.addEventListener(type, (event) => { event.preventDefault(); els.dropzone.classList.remove('dragging'); }));
+      els.dropzone.addEventListener('drop', (event) => loadFile(event.dataTransfer.files[0]));
+      els.sourceVideo.addEventListener('loadedmetadata', () => {
+        els.fileMeta.textContent = `${formatBytes(file.size)} · ${els.sourceVideo.videoWidth}×${els.sourceVideo.videoHeight} · ${els.sourceVideo.duration.toFixed(1)} 秒`;
+        document.querySelector('.viewer').style.aspectRatio = `${els.sourceVideo.videoWidth} / ${els.sourceVideo.videoHeight}`;
+      });
+      document.querySelectorAll('[data-invert]').forEach((button) => button.addEventListener('click', () => {
+        document.querySelectorAll('[data-invert]').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        invert = button.dataset.invert === 'true';
+      }));
+      document.querySelectorAll('[data-source]').forEach((button) => button.addEventListener('click', () => {
+        if (jobInFlight) return toast('当前任务处理中，请等待完成后再切换素材来源。', true);
+        document.querySelectorAll('[data-source]').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        sourceMode = button.dataset.source;
+        els.fileSource.classList.toggle('hidden', sourceMode !== 'file');
+        els.urlSource.classList.toggle('visible', sourceMode === 'url');
+        els.fileInfo.classList.toggle('visible', sourceMode === 'file' && Boolean(file));
+        updateGenerateAvailability();
+        els.projectName.textContent = sourceMode === 'file' ? (file?.name || '未载入动作视频') : (els.videoUrl.value.trim() || '等待视频直链');
+      }));
+      els.videoUrl.addEventListener('input', () => {
+        if (sourceMode !== 'url') return;
+        updateGenerateAvailability();
+        els.projectName.textContent = els.videoUrl.value.trim() || '等待视频直链';
+      });
+      els.smoothing.addEventListener('input', updateSlider);
+      els.generate.addEventListener('click', generate);
+      window.addEventListener('beforeunload', () => { clearTimeout(pollTimer); if (sourceUrl) URL.revokeObjectURL(sourceUrl); });
+      updateSlider();
+      renderHistory();
+      if (history[0]) openJob(history[0].id, true);
+      else fetch('/health').then((response) => { if (!response.ok) throw new Error(); return response.json(); }).then(() => setStatus('服务就绪')).catch(() => setStatus('后端服务未连接', 'error'));
+    })();
+  </script>
+</body>
+</html>
