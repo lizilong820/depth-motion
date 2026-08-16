@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import shutil
 from threading import Lock
 
 from app.config import settings
 from app.depth.video import process_depth_video
 from app.errors import InvalidUploadError
 from app.jobs.downloader import download_video
+from app.jobs.options import ProcessingOptions
 from app.jobs.platform_downloader import detect_platform, download_platform_video
 from app.jobs.store import job_store
 
@@ -33,17 +35,12 @@ def release_job_slot() -> None:
         _job_reserved = False
 
 
-def run_depth_job(job_id: str, invert: bool, temporal_smoothing: float) -> None:
+def run_depth_job(job_id: str) -> None:
     with _job_execution_lock:
-        _run_depth_job(job_id, invert, temporal_smoothing)
+        _run_depth_job(job_id)
 
 
-def run_remote_depth_job(
-    job_id: str,
-    url: str,
-    invert: bool,
-    temporal_smoothing: float,
-) -> None:
+def run_remote_depth_job(job_id: str, url: str) -> None:
     with _job_execution_lock:
         placeholder: Path | None = None
         try:
@@ -56,6 +53,7 @@ def run_remote_depth_job(
                 result = download_platform_video(url, placeholder.parent, settings.max_upload_bytes)
                 source_path = result.source_path
                 filename = result.filename
+                platform = result.platform
             else:
                 result = download_video(url, placeholder.parent, settings.max_upload_bytes)
                 source_path = placeholder.parent / f"source{result.suffix}"
@@ -64,9 +62,10 @@ def run_remote_depth_job(
                 job_id,
                 filename=filename,
                 input_path=str(source_path),
-                message="视频下载完成",
+                source_platform=platform or "remote",
+                message="视频下载完成，正在验证",
             )
-            _run_depth_job(job_id, invert, temporal_smoothing, release_slot=False)
+            _run_depth_job(job_id, release_slot=False)
         except Exception as exc:
             logger.exception("remote_job_failed job_id=%s", job_id)
             public_error = exc.message if isinstance(exc, InvalidUploadError) else "视频下载或处理失败"
@@ -89,16 +88,12 @@ def run_remote_depth_job(
                 release_job_slot()
 
 
-def _run_depth_job(
-    job_id: str,
-    invert: bool,
-    temporal_smoothing: float,
-    release_slot: bool = True,
-) -> None:
+def _run_depth_job(job_id: str, release_slot: bool = True) -> None:
     try:
         job = job_store.get(job_id)
-        job_store.update(job_id, status="loading_model", progress=3, message="正在加载深度模型")
-
+        options = ProcessingOptions.from_dict(job.options)
+        options.validate()
+        job_store.update(job_id, status="loading_model", progress=3, message="正在验证视频并加载深度模型")
         last_reported = 0
 
         def report(frame: int, total: int) -> None:
@@ -119,24 +114,37 @@ def _run_depth_job(
             source_path=Path(job.input_path),
             output_path=Path(job.output_path),
             work_dir=Path(job.output_path).parent,
-            invert=invert,
-            temporal_smoothing=temporal_smoothing,
+            options=options,
             progress=report,
+            source_platform=job.source_platform,
         )
         job_store.update(
             job_id,
             status="completed",
             progress=100,
-            message="深度视频已生成",
+            message="ComfyUI 深度素材已生成" if options.create_package else "深度视频已生成",
             metadata=metadata,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("depth_job_failed job_id=%s", job_id)
+        public_error = exc.message if isinstance(exc, InvalidUploadError) else "深度视频处理失败"
+        try:
+            job = job_store.get(job_id)
+            work_dir = Path(job.output_path).parent
+            for filename in (
+                "source-normalized.mp4", "depth-silent.mp4", "depth.mp4",
+                "manifest.json", "depth-frames.zip", "depth-frames.zip.tmp",
+                "comfyui-package.zip", "comfyui-package.zip.tmp",
+            ):
+                (work_dir / filename).unlink(missing_ok=True)
+            shutil.rmtree(work_dir / "depth-frames", ignore_errors=True)
+        except Exception:
+            logger.exception("depth_job_cleanup_failed job_id=%s", job_id)
         job_store.update(
             job_id,
             status="failed",
             message="处理失败",
-            error="深度视频处理失败",
+            error=public_error,
         )
     finally:
         if release_slot:

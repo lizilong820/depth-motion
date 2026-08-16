@@ -10,6 +10,9 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 class Settings:
     data_dir: Path = Path(os.getenv("DATA_DIR", ROOT_DIR / "data"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "500"))
+    max_video_seconds: int = int(os.getenv("MAX_VIDEO_SECONDS", "300"))
+    max_video_frames: int = int(os.getenv("MAX_VIDEO_FRAMES", "9000"))
+    max_video_pixels: int = int(os.getenv("MAX_VIDEO_PIXELS", "8294400"))
     model_id: str = os.getenv(
         "DEPTH_MODEL_ID", "depth-anything/Depth-Anything-V2-Small-hf"
     )

@@ -21,11 +21,15 @@ class DepthEstimator:
         self._inference_lock = Lock()
 
     @torch.inference_mode()
-    def predict(self, frame_bgr: np.ndarray, invert: bool = False) -> np.ndarray:
+    def predict_raw(self, frame_bgr: np.ndarray) -> np.ndarray:
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(rgb)
         with self._inference_lock:
-            inputs = self.processor(images=image, return_tensors="pt")
+            inputs = self.processor(
+                images=image,
+                return_tensors="pt",
+                size={"height": settings.inference_size, "width": settings.inference_size},
+            )
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
             output = self.model(**inputs).predicted_depth
         depth = torch.nn.functional.interpolate(
@@ -34,7 +38,10 @@ class DepthEstimator:
             mode="bicubic",
             align_corners=False,
         ).squeeze()
-        depth = depth.detach().float().cpu().numpy()
+        return depth.detach().float().cpu().numpy()
+
+    def predict(self, frame_bgr: np.ndarray, invert: bool = False) -> np.ndarray:
+        depth = self.predict_raw(frame_bgr)
         low, high = np.percentile(depth, (2, 98))
         normalized = np.clip((depth - low) / max(high - low, 1e-6), 0, 1)
         if invert:

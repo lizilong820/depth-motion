@@ -1,5 +1,9 @@
+from pathlib import Path
+import shutil
+
 from fastapi.testclient import TestClient
 
+from app.jobs.store import job_store
 from app.main import app
 
 
@@ -25,3 +29,57 @@ def test_missing_job() -> None:
     response = client.get("/api/jobs/missing")
     assert response.status_code == 404
     assert response.json()["code"] == "JOB_NOT_FOUND"
+
+
+def test_remote_job_rejects_invalid_time_range() -> None:
+    response = client.post(
+        "/api/jobs/remote",
+        json={"url": "https://example.com/video.mp4", "start_time": 4, "end_time": 2},
+    )
+    assert response.status_code == 422
+
+
+def test_completed_job_exposes_and_downloads_artifacts() -> None:
+    job = job_store.create(filename="clip.mp4", suffix=".mp4")
+    try:
+        directory = job.directory
+        Path(job.output_path).write_bytes(b"depth-video")
+        (directory / "manifest.json").write_text('{"frames": 2}', encoding="utf-8")
+        (directory / "depth-frames.zip").write_bytes(b"frames-zip")
+        (directory / "comfyui-package.zip").write_bytes(b"package-zip")
+        job_store.update(job.id, status="completed", progress=100)
+
+        details = client.get(f"/api/jobs/{job.id}").json()
+        assert details["manifest_url"] == f"/api/jobs/{job.id}/manifest"
+        assert details["frames_url"] == f"/api/jobs/{job.id}/frames"
+        assert details["package_url"] == f"/api/jobs/{job.id}/package"
+
+        expected = {
+            "manifest": ("application/json", b'{"frames": 2}'),
+            "frames": ("application/zip", b"frames-zip"),
+            "package": ("application/zip", b"package-zip"),
+        }
+        for kind, (media_type, content) in expected.items():
+            response = client.get(f"/api/jobs/{job.id}/{kind}")
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith(media_type)
+            assert response.content == content
+    finally:
+        job_store.delete(job.id)
+        shutil.rmtree(job.directory, ignore_errors=True)
+
+
+def test_artifacts_require_completed_job_and_existing_file() -> None:
+    job = job_store.create(filename="clip.mp4", suffix=".mp4")
+    try:
+        response = client.get(f"/api/jobs/{job.id}/manifest")
+        assert response.status_code == 409
+        assert response.json()["code"] == "JOB_NOT_READY"
+
+        job_store.update(job.id, status="completed", progress=100)
+        response = client.get(f"/api/jobs/{job.id}/package")
+        assert response.status_code == 409
+        assert response.json()["code"] == "JOB_NOT_READY"
+    finally:
+        job_store.delete(job.id)
+        shutil.rmtree(job.directory, ignore_errors=True)

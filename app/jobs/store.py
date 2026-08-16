@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -27,14 +27,40 @@ class Job:
     output_path: str
     error: str | None = None
     metadata: dict | None = None
+    options: dict = field(default_factory=dict)
+    source_platform: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Job":
+        allowed = cls.__dataclass_fields__.keys()
+        return cls(**{key: value for key, value in data.items() if key in allowed})
+
+    @property
+    def directory(self) -> Path:
+        return Path(self.output_path).parent
+
+    def artifact_path(self, kind: str) -> Path | None:
+        names = {
+            "manifest": "manifest.json",
+            "frames": "depth-frames.zip",
+            "package": "comfyui-package.zip",
+        }
+        filename = names.get(kind)
+        return self.directory / filename if filename else None
 
     def public(self) -> dict:
         data = asdict(self)
         data.pop("input_path")
         data.pop("output_path")
-        data["download_url"] = f"/api/jobs/{self.id}/download" if self.status == "completed" else None
-        data["preview_url"] = f"/api/jobs/{self.id}/preview" if self.status == "completed" else None
+        completed = self.status == "completed"
+        data["download_url"] = f"/api/jobs/{self.id}/download" if completed else None
+        data["preview_url"] = f"/api/jobs/{self.id}/preview" if completed else None
         data["source_url"] = f"/api/jobs/{self.id}/source"
+        for kind in ("manifest", "frames", "package"):
+            path = self.artifact_path(kind)
+            data[f"{kind}_url"] = (
+                f"/api/jobs/{self.id}/{kind}" if completed and path and path.is_file() else None
+            )
         return data
 
 
@@ -57,7 +83,7 @@ class JobStore:
         for path in settings.jobs_dir.glob("*/job.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                job = Job(**data)
+                job = Job.from_dict(data)
                 if job.status not in {"completed", "failed"}:
                     job.status = "failed"
                     job.message = "服务重启导致任务中断"
@@ -67,7 +93,13 @@ class JobStore:
             except (OSError, ValueError, TypeError):
                 continue
 
-    def create(self, filename: str, suffix: str) -> Job:
+    def create(
+        self,
+        filename: str,
+        suffix: str,
+        options: dict | None = None,
+        source_platform: str | None = None,
+    ) -> Job:
         job_id = uuid4().hex
         job_dir = settings.jobs_dir / job_id
         job_dir.mkdir(parents=True, exist_ok=False)
@@ -80,6 +112,8 @@ class JobStore:
             created_at=datetime.now(timezone.utc).isoformat(),
             input_path=str(job_dir / f"source{suffix}"),
             output_path=str(job_dir / "depth.mp4"),
+            options=options or {},
+            source_platform=source_platform,
         )
         with self._lock:
             self._jobs[job_id] = job
@@ -99,7 +133,8 @@ class JobStore:
             if job is None:
                 raise JobNotFoundError(job_id)
             for key, value in changes.items():
-                setattr(job, key, value)
+                if key in Job.__dataclass_fields__:
+                    setattr(job, key, value)
             self._save(job)
             return job
 
