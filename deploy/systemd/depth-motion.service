@@ -1,0 +1,25 @@
+[Unit]
+Description=Depth Motion AI Video Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@APP_USER@
+Group=@APP_GROUP@
+WorkingDirectory=@APP_DIR@
+EnvironmentFile=/etc/depth-motion.env
+ExecStartPre=/usr/bin/test -f @APP_DIR@/model/model.safetensors
+ExecStart=@APP_DIR@/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/depth-motion /var/cache/depth-motion
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

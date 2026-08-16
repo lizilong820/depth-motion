@@ -1,0 +1,11 @@
+[Unit]
+Description=Clean expired Depth Motion jobs daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+Unit=depth-motion-cleanup.service
+
+[Install]
+WantedBy=timers.target
