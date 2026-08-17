@@ -62,6 +62,13 @@
     .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
     .segment { min-height: 43px; border: 1px solid var(--line); border-radius: 4px; background: #141614; color: var(--muted); cursor: pointer; font-size: 11px; }
     .segment.active { border-color: var(--accent); background: var(--accent); color: #11130d; font-weight: 750; }
+    .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .preset { min-height: 46px; display: grid; align-content: center; gap: 3px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: #141614; color: var(--text); text-align: left; cursor: pointer; }
+    .preset strong { font-size: 11px; }
+    .preset span { color: var(--muted); font-size: 9px; }
+    .preset.active { border-color: var(--accent); background: #20251a; }
+    .preset.active span { color: var(--accent); }
+    .preset.custom { grid-column: 1 / -1; min-height: 36px; grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
     .control { margin-top: 18px; }
     .control label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; font-size: 12px; }
     .control label span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -75,6 +82,12 @@
     .result-actions .btn { min-height: 38px; font-size: 11px; }
     .result-actions .optional { display: none; }
     .result-actions .optional.visible { display: inline-flex; }
+    .result-details { display: none; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; padding: 1px; border-top: 1px solid var(--line); background: var(--line); }
+    .result-details.visible { display: grid; }
+    .result-detail { min-width: 0; padding: 10px 12px; background: #141614; }
+    .result-detail span, .result-detail strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result-detail span { color: var(--muted); font-size: 9px; }
+    .result-detail strong { margin-top: 4px; font-size: 11px; font-variant-numeric: tabular-nums; }
     input[type="range"] { width: 100%; height: 20px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
     input[type="range"]::-webkit-slider-runnable-track { height: 3px; background: linear-gradient(90deg,var(--accent) var(--fill,25%),#454a45 var(--fill,25%)); }
     input[type="range"]::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -6px; appearance: none; border: 2px solid #111; border-radius: 50%; background: #fff; }
@@ -160,6 +173,8 @@
       .resultbar { align-items:flex-start; flex-direction:column; }
       .result-actions { width:100%; justify-content:stretch; }
       .result-actions .btn { flex:1; }
+      .result-details { grid-template-columns:1fr 1fr; }
+      .result-detail:last-child { grid-column:1 / -1; }
       .statusbar span:last-child { display:none; }
     }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
@@ -208,7 +223,19 @@
         </section>
 
         <section class="section">
-          <div class="section-head"><h2>02 / 深度参数</h2></div>
+          <div class="section-head"><h2>02 / 工作流预设</h2><output id="presetState">标准深度</output></div>
+          <div class="preset-grid" role="group" aria-label="工作流预设">
+            <button class="preset" data-preset="quick_preview"><strong>快速预览</strong><span>768 边 / 12 FPS</span></button>
+            <button class="preset active" data-preset="standard_depth"><strong>标准深度</strong><span>1280 边 / 24 FPS</span></button>
+            <button class="preset" data-preset="motion_character"><strong>人物动作</strong><span>1024 边 / 24 FPS</span></button>
+            <button class="preset" data-preset="comfyui_package"><strong>ComfyUI 素材包</strong><span>MP4 + PNG + Manifest</span></button>
+            <button class="preset" data-preset="high_quality_png"><strong>高质量 PNG</strong><span>1920 边 / 30 FPS</span></button>
+            <button class="preset custom" data-preset="custom"><strong>自定义</strong><span>手动调整以下输出参数</span></button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>03 / 深度参数</h2></div>
           <div class="segmented" role="group" aria-label="深度方向">
             <button class="segment active" data-invert="false">白近 · 黑远</button>
             <button class="segment" data-invert="true">黑近 · 白远</button>
@@ -221,14 +248,16 @@
         </section>
 
         <section class="section">
-          <div class="section-head"><h2>03 / 输出规格</h2></div>
+          <div class="section-head"><h2>04 / 输出规格</h2><output id="outputSummary">最长边 1280 · 最高 24 FPS</output></div>
           <div class="field-grid">
             <label class="field">开始时间（秒）<input id="startTime" type="number" min="0" step="0.1" value="0"></label>
             <label class="field">结束时间（可选）<input id="endTime" type="number" min="0.1" step="0.1" placeholder="跟随原片"></label>
             <label class="field">输出宽度<input id="outputWidth" type="number" min="128" max="1920" step="2" placeholder="原片"></label>
             <label class="field">输出高度<input id="outputHeight" type="number" min="128" max="1920" step="2" placeholder="原片"></label>
-            <label class="field">输出帧率<select id="outputFps"><option value="">跟随原片</option><option>8</option><option>12</option><option>16</option><option>24</option><option>30</option></select></label>
+            <label class="field">输出帧率<select id="outputFps"><option value="">跟随预设</option><option>8</option><option>12</option><option>16</option><option>24</option><option>30</option><option>60</option></select></label>
             <label class="field">画面适配<select id="fitMode"><option value="contain">完整画面</option><option value="cover">居中裁切</option><option value="stretch">拉伸填满</option></select></label>
+            <label class="field">最长边上限<select id="maxOutputSide"><option value="">不限制</option><option value="512">512</option><option value="768">768</option><option value="1024">1024</option><option value="1280">1280</option><option value="1920">1920</option></select></label>
+            <label class="field">帧率上限<select id="maxOutputFps"><option value="">跟随原片</option><option value="8">8 FPS</option><option value="12">12 FPS</option><option value="16">16 FPS</option><option value="24">24 FPS</option><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
           </div>
           <div class="check-list">
             <label class="check"><input id="exportPng" type="checkbox">生成 PNG 序列 ZIP</label>
@@ -246,7 +275,7 @@
         </section>
 
         <section class="section">
-          <div class="section-head"><h2>04 / 最近生成</h2><output id="historyCount">0</output></div>
+          <div class="section-head"><h2>05 / 最近生成</h2><output id="historyCount">0</output></div>
           <div class="history-list" id="historyList" aria-live="polite">
             <p class="history-empty">当前浏览器还没有生成记录。</p>
           </div>
@@ -294,11 +323,23 @@
         <div class="resultbar" id="resultbar">
           <div class="result-copy"><strong>深度视频已生成</strong><span id="resultMeta">可直接作为 AI 视频工作流的动作控制输入</span></div>
           <div class="result-actions">
+            <button class="btn" id="copyJobBtn" type="button">复制任务 ID</button>
+            <button class="btn" id="detailsBtn" type="button" aria-expanded="false">查看输出参数</button>
             <a class="btn" id="downloadBtn" href="#" download>下载 MP4</a>
             <a class="btn optional" id="manifestBtn" href="#" download>Manifest</a>
             <a class="btn optional" id="framesBtn" href="#" download>PNG ZIP</a>
             <a class="btn optional" id="packageBtn" href="#" download>ComfyUI 包</a>
           </div>
+        </div>
+        <div class="result-details" id="resultDetails" aria-hidden="true">
+          <div class="result-detail"><span>任务 ID</span><strong id="detailJob">-</strong></div>
+          <div class="result-detail"><span>工作流</span><strong id="detailPreset">-</strong></div>
+          <div class="result-detail"><span>输出尺寸</span><strong id="detailSize">-</strong></div>
+          <div class="result-detail"><span>帧率 / 帧数</span><strong id="detailFrames">-</strong></div>
+          <div class="result-detail"><span>来源平台</span><strong id="detailPlatform">-</strong></div>
+          <div class="result-detail"><span>深度参数</span><strong id="detailDepth">-</strong></div>
+          <div class="result-detail"><span>画面适配</span><strong id="detailFit">-</strong></div>
+          <div class="result-detail"><span>导出内容</span><strong id="detailExport">-</strong></div>
         </div>
       </section>
     </div>
@@ -320,16 +361,28 @@
         sourceVideo: $('sourceVideo'), empty: $('emptyState'), projectName: $('projectName'), smoothing: $('smoothing'), smoothingValue: $('smoothingValue'),
         generate: $('generateBtn'), processing: $('processing'), progressMessage: $('progressMessage'), progressFill: $('progressFill'), progressStage: $('progressStage'), progressPercent: $('progressPercent'),
         compare: $('compareView'), originalResult: $('originalResult'), depthResult: $('depthResult'), resultbar: $('resultbar'), resultMeta: $('resultMeta'), download: $('downloadBtn'),
-        manifest: $('manifestBtn'), frames: $('framesBtn'), package: $('packageBtn'), startTime: $('startTime'), endTime: $('endTime'), outputWidth: $('outputWidth'), outputHeight: $('outputHeight'), outputFps: $('outputFps'), fitMode: $('fitMode'), exportPng: $('exportPng'), createPackage: $('createPackage'), sceneCutReset: $('sceneCutReset'),
+        manifest: $('manifestBtn'), frames: $('framesBtn'), package: $('packageBtn'), startTime: $('startTime'), endTime: $('endTime'), outputWidth: $('outputWidth'), outputHeight: $('outputHeight'), outputFps: $('outputFps'), maxOutputSide: $('maxOutputSide'), maxOutputFps: $('maxOutputFps'), fitMode: $('fitMode'), exportPng: $('exportPng'), createPackage: $('createPackage'), sceneCutReset: $('sceneCutReset'),
+        presetState: $('presetState'), outputSummary: $('outputSummary'), copyJob: $('copyJobBtn'), details: $('detailsBtn'), resultDetails: $('resultDetails'), detailJob: $('detailJob'), detailPreset: $('detailPreset'), detailSize: $('detailSize'), detailFrames: $('detailFrames'), detailPlatform: $('detailPlatform'), detailDepth: $('detailDepth'), detailFit: $('detailFit'), detailExport: $('detailExport'),
         viewerTitle: $('viewerTitle'), viewerMeta: $('viewerMeta'), statusText: $('statusText'), statusDot: $('statusDot'), toast: $('toast'),
         historyList: $('historyList'), historyCount: $('historyCount')
       };
       const HISTORY_KEY = 'depth-motion.jobs.v1';
       const MAX_HISTORY = 8;
+      const PRESETS = {
+        quick_preview: { label: '快速预览', side: 768, fps: 12, smoothing: 20, stabilize: 0.78, png: false, package: false },
+        standard_depth: { label: '标准深度', side: 1280, fps: 24, smoothing: 25, stabilize: 0.85, png: false, package: false },
+        motion_character: { label: '人物动作', side: 1024, fps: 24, smoothing: 32, stabilize: 0.9, png: false, package: false },
+        comfyui_package: { label: 'ComfyUI 素材包', side: 1280, fps: 24, smoothing: 25, stabilize: 0.85, png: true, package: true },
+        high_quality_png: { label: '高质量 PNG', side: 1920, fps: 30, smoothing: 20, stabilize: 0.82, png: true, package: false },
+        custom: { label: '自定义' }
+      };
       let file = null;
       let sourceUrl = '';
       let sourceMode = 'file';
       let invert = false;
+      let selectedPreset = 'standard_depth';
+      let stabilizeRange = PRESETS.standard_depth.stabilize;
+      let applyingPreset = false;
       let pollTimer = 0;
       let toastTimer = 0;
       let jobInFlight = false;
@@ -435,12 +488,66 @@
         els.smoothingValue.textContent = `${percent}%`;
         els.smoothing.style.setProperty('--fill', `${(percent / 70) * 100}%`);
       }
+      function updateOutputSummary() {
+        const dimensions = els.outputWidth.value || els.outputHeight.value
+          ? `${els.outputWidth.value || '自动'} × ${els.outputHeight.value || '自动'}`
+          : `最长边 ${els.maxOutputSide.value || '原片'}`;
+        const fps = els.outputFps.value
+          ? `${els.outputFps.value} FPS`
+          : `最高 ${els.maxOutputFps.value || '原片'} FPS`;
+        els.outputSummary.textContent = `${dimensions} · ${fps}`;
+      }
+      function selectPreset(name, applyValues = true) {
+        const preset = PRESETS[name] || PRESETS.custom;
+        selectedPreset = name in PRESETS ? name : 'custom';
+        applyingPreset = true;
+        if (applyValues && selectedPreset !== 'custom') {
+          els.outputWidth.value = '';
+          els.outputHeight.value = '';
+          els.outputFps.value = '';
+          els.maxOutputSide.value = String(preset.side);
+          els.maxOutputFps.value = String(preset.fps);
+          els.smoothing.value = String(preset.smoothing);
+          els.exportPng.checked = preset.png;
+          els.createPackage.checked = preset.package;
+          stabilizeRange = preset.stabilize;
+          updateSlider();
+        }
+        document.querySelectorAll('[data-preset]').forEach((button) => {
+          button.classList.toggle('active', button.dataset.preset === selectedPreset);
+        });
+        els.presetState.textContent = preset.label;
+        applyingPreset = false;
+        updateOutputSummary();
+      }
+      function markCustom() {
+        if (!applyingPreset) selectPreset('custom', false);
+      }
+      function platformLabel(value) {
+        const labels = { douyin: '抖音', bilibili: 'B站', youtube: 'YouTube', upload: '本地上传', remote: '视频直链' };
+        return labels[value] || value || '未知';
+      }
+      function detectUrlPlatform(value) {
+        try {
+          const host = new URL(value).hostname.toLowerCase();
+          if (host.includes('douyin.com')) return '抖音';
+          if (host.includes('bilibili.com') || host === 'b23.tv') return 'B站';
+          if (host.includes('youtube.com') || host === 'youtu.be') return 'YouTube';
+          return '视频直链';
+        } catch (_) {
+          return '';
+        }
+      }
       function resetResult() {
         clearTimeout(pollTimer);
         [els.manifest, els.frames, els.package].forEach((element) => element.classList.remove('visible'));
         els.processing.classList.remove('visible');
         els.compare.classList.remove('visible');
         els.resultbar.classList.remove('visible');
+        els.resultDetails.classList.remove('visible');
+        els.resultDetails.setAttribute('aria-hidden', 'true');
+        els.details.setAttribute('aria-expanded', 'false');
+        els.details.textContent = '查看输出参数';
         els.sourceVideo.style.display = 'block';
         els.viewerTitle.textContent = '动作视频预览';
         els.viewerMeta.textContent = 'DEPTH MAP / READY';
@@ -470,6 +577,7 @@
       function processingOptions() {
         const optionalNumber = (element) => element.value === '' ? null : Number(element.value);
         return {
+          preset: selectedPreset,
           invert,
           temporal_smoothing: Number(els.smoothing.value) / 100,
           start_time: Number(els.startTime.value || 0),
@@ -477,10 +585,12 @@
           output_width: optionalNumber(els.outputWidth),
           output_height: optionalNumber(els.outputHeight),
           output_fps: optionalNumber(els.outputFps),
+          max_output_side: optionalNumber(els.maxOutputSide),
+          max_output_fps: optionalNumber(els.maxOutputFps),
           fit_mode: els.fitMode.value,
           export_png: els.exportPng.checked,
           create_package: els.createPackage.checked,
-          stabilize_range: 0.85,
+          stabilize_range: stabilizeRange,
           scene_cut_reset: els.sceneCutReset.checked,
           scene_cut_threshold: 0.32
         };
@@ -554,8 +664,15 @@
           const percent = Math.max(1, job.progress || 0);
           els.progressFill.style.width = `${percent}%`;
           els.progressPercent.textContent = `${percent}%`;
-          els.progressMessage.textContent = job.message;
-          els.progressStage.textContent = job.status.toUpperCase();
+          const stageLabels = {
+            queued: '等待服务器处理', downloading: job.source_platform && job.source_platform !== 'remote' ? `正在解析并下载${platformLabel(job.source_platform)}视频` : '正在下载远程视频',
+            loading_model: '正在验证视频并加载深度模型', processing: '正在逐帧估计动作深度', encoding: job.options?.create_package ? '正在编码并打包 ComfyUI 素材' : '正在编码深度视频'
+          };
+          const stageCodes = { queued: 'QUEUED', downloading: 'FETCHING', loading_model: 'MODEL', processing: 'DEPTH' };
+          els.progressMessage.textContent = stageLabels[job.status] || job.message;
+          els.progressStage.textContent = job.status === 'encoding'
+            ? (job.options?.create_package ? 'PACKAGING' : 'ENCODING')
+            : (stageCodes[job.status] || job.status.toUpperCase());
           setStatus(job.message, 'busy');
           if (job.status === 'completed') return complete(job, restoring);
           if (job.status === 'failed') return fail(job.error || '深度视频生成失败', job);
@@ -580,7 +697,17 @@
           if (url) element.href = url;
         });
         const meta = job.metadata || {};
+        const presetName = PRESETS[job.options?.preset || 'standard_depth']?.label || '自定义';
         els.resultMeta.textContent = `${meta.width || '-'} × ${meta.height || '-'} · ${meta.fps || '-'} FPS · ${meta.frames || '-'} 帧 · ${meta.scene_cuts || 0} 次切镜 · ${String(meta.device || 'CPU').toUpperCase()}`;
+        els.detailJob.textContent = job.id;
+        els.detailPreset.textContent = presetName;
+        els.detailSize.textContent = `${meta.width || '-'} × ${meta.height || '-'}`;
+        els.detailFrames.textContent = `${meta.fps || '-'} FPS / ${meta.frames || '-'} 帧`;
+        els.detailPlatform.textContent = platformLabel(job.source_platform);
+        const options = job.options || {};
+        els.detailDepth.textContent = `${options.invert ? '黑近白远' : '白近黑远'} / 稳定 ${Math.round((options.temporal_smoothing ?? 0.25) * 100)}%`;
+        els.detailFit.textContent = { contain: '完整画面', cover: '居中裁切', stretch: '拉伸填满' }[options.fit_mode] || '完整画面';
+        els.detailExport.textContent = options.create_package ? 'ComfyUI 完整包' : options.export_png ? 'MP4 + PNG ZIP' : '深度 MP4';
         els.viewerTitle.textContent = '结果对比';
         els.viewerMeta.textContent = 'ORIGINAL / DEPTH';
         els.projectName.textContent = job.filename || '已恢复生成任务';
@@ -621,6 +748,7 @@
         document.querySelectorAll('[data-invert]').forEach((item) => item.classList.remove('active'));
         button.classList.add('active');
         invert = button.dataset.invert === 'true';
+        markCustom();
       }));
       document.querySelectorAll('[data-source]').forEach((button) => button.addEventListener('click', () => {
         if (jobInFlight) return toast('当前任务处理中，请等待完成后再切换素材来源。', true);
@@ -631,20 +759,50 @@
         els.urlSource.classList.toggle('visible', sourceMode === 'url');
         els.fileInfo.classList.toggle('visible', sourceMode === 'file' && Boolean(file));
         updateGenerateAvailability();
-        els.projectName.textContent = sourceMode === 'file' ? (file?.name || '未载入动作视频') : (els.videoUrl.value.trim() || '等待视频直链');
+        if (sourceMode === 'file') {
+          els.projectName.textContent = file?.name || '未载入动作视频';
+        } else {
+          const url = els.videoUrl.value.trim();
+          const platform = detectUrlPlatform(url);
+          els.projectName.textContent = url ? `${platform || '视频链接'} · ${url}` : '等待视频链接';
+          if (url && platform) setStatus(`已识别${platform}链接`);
+        }
       }));
       els.videoUrl.addEventListener('input', () => {
         if (sourceMode !== 'url') return;
         updateGenerateAvailability();
-        els.projectName.textContent = els.videoUrl.value.trim() || '等待视频直链';
+        const url = els.videoUrl.value.trim();
+        const platform = detectUrlPlatform(url);
+        els.projectName.textContent = url ? `${platform || '视频链接'} · ${url}` : '等待视频链接';
+        setStatus(url && platform ? `已识别${platform}链接` : '等待有效视频链接');
       });
-      els.smoothing.addEventListener('input', updateSlider);
+      document.querySelectorAll('[data-preset]').forEach((button) => button.addEventListener('click', () => selectPreset(button.dataset.preset)));
+      [els.startTime, els.endTime, els.outputWidth, els.outputHeight, els.outputFps, els.maxOutputSide, els.maxOutputFps, els.fitMode, els.exportPng, els.createPackage, els.sceneCutReset].forEach((element) => {
+        element.addEventListener('change', () => { markCustom(); updateOutputSummary(); });
+      });
+      els.smoothing.addEventListener('input', () => { updateSlider(); markCustom(); });
       els.createPackage.addEventListener('change', () => {
         if (els.createPackage.checked) els.exportPng.checked = true;
       });
+      els.copyJob.addEventListener('click', async () => {
+        if (!activeJobId) return;
+        try {
+          await navigator.clipboard.writeText(activeJobId);
+          toast('任务 ID 已复制。');
+        } catch (_) {
+          toast(`任务 ID：${activeJobId}`);
+        }
+      });
+      els.details.addEventListener('click', () => {
+        const visible = !els.resultDetails.classList.contains('visible');
+        els.resultDetails.classList.toggle('visible', visible);
+        els.resultDetails.setAttribute('aria-hidden', String(!visible));
+        els.details.setAttribute('aria-expanded', String(visible));
+        els.details.textContent = visible ? '收起输出参数' : '查看输出参数';
+      });
       els.generate.addEventListener('click', generate);
       window.addEventListener('beforeunload', () => { clearTimeout(pollTimer); if (sourceUrl) URL.revokeObjectURL(sourceUrl); });
-      updateSlider();
+      selectPreset('standard_depth');
       renderHistory();
       if (history[0]) openJob(history[0].id, true);
       else fetch('/health').then((response) => { if (!response.ok) throw new Error(); return response.json(); }).then(() => setStatus('服务就绪')).catch(() => setStatus('后端服务未连接', 'error'));

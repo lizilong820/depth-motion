@@ -103,7 +103,8 @@ def resolve_output(probe: VideoProbe, options: ProcessingOptions) -> dict:
     width = options.output_width
     height = options.output_height
     if width is None and height is None:
-        scale = min(1.0, 1920 / max(probe.width, probe.height))
+        output_limit = options.max_output_side or 1920
+        scale = min(1.0, output_limit / max(probe.width, probe.height))
         width = int(probe.width * scale)
         height = int(probe.height * scale)
     elif width is None:
@@ -118,7 +119,8 @@ def resolve_output(probe: VideoProbe, options: ProcessingOptions) -> dict:
             height = 1920
     width = max(2, int(width) // 2 * 2)
     height = max(2, int(height) // 2 * 2)
-    fps = min(options.output_fps or probe.fps, probe.fps, 60.0)
+    requested_fps = options.output_fps or options.max_output_fps or probe.fps
+    fps = min(requested_fps, probe.fps, 60.0)
     duration = end - options.start_time
     frames = max(1, int(round(duration * fps)))
     if frames > settings.max_video_frames:

@@ -7,10 +7,19 @@ from app.errors import InvalidUploadError
 
 
 FitMode = Literal["contain", "cover", "stretch"]
+PresetName = Literal[
+    "quick_preview",
+    "standard_depth",
+    "motion_character",
+    "comfyui_package",
+    "high_quality_png",
+    "custom",
+]
 
 
 @dataclass(frozen=True)
 class ProcessingOptions:
+    preset: PresetName = "standard_depth"
     invert: bool = False
     temporal_smoothing: float = 0.25
     start_time: float = 0.0
@@ -18,6 +27,8 @@ class ProcessingOptions:
     output_width: int | None = None
     output_height: int | None = None
     output_fps: float | None = None
+    max_output_side: int | None = None
+    max_output_fps: float | None = None
     fit_mode: FitMode = "contain"
     export_png: bool = False
     create_package: bool = False
@@ -36,6 +47,11 @@ class ProcessingOptions:
         return cls(**{key: item for key, item in value.items() if key in allowed})
 
     def validate(self) -> None:
+        if self.preset not in {
+            "quick_preview", "standard_depth", "motion_character",
+            "comfyui_package", "high_quality_png", "custom",
+        }:
+            raise InvalidUploadError("工作流预设不正确")
         if not 0 <= self.temporal_smoothing <= 0.9:
             raise InvalidUploadError("时序稳定度必须在 0 到 0.9 之间")
         if self.start_time < 0:
@@ -47,6 +63,10 @@ class ProcessingOptions:
                 raise InvalidUploadError(f"{name}必须在 128 到 1920 之间")
         if self.output_fps is not None and not 1 <= self.output_fps <= 60:
             raise InvalidUploadError("输出帧率必须在 1 到 60 FPS 之间")
+        if self.max_output_side is not None and not 128 <= self.max_output_side <= 1920:
+            raise InvalidUploadError("输出最长边必须在 128 到 1920 之间")
+        if self.max_output_fps is not None and not 1 <= self.max_output_fps <= 60:
+            raise InvalidUploadError("输出帧率上限必须在 1 到 60 FPS 之间")
         if self.fit_mode not in {"contain", "cover", "stretch"}:
             raise InvalidUploadError("输出适配模式不正确")
         if not 0 <= self.stabilize_range <= 0.98:

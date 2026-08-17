@@ -11,7 +11,7 @@ from app.config import settings
 from app.depth.probe import probe_video
 from app.errors import InvalidUploadError, JobNotReadyError, ServerBusyError
 from app.jobs.downloader import validate_remote_target
-from app.jobs.options import FitMode, ProcessingOptions
+from app.jobs.options import FitMode, PresetName, ProcessingOptions
 from app.jobs.platform_downloader import detect_platform, validate_platform_url
 from app.jobs.service import release_job_slot, reserve_job_slot, run_depth_job, run_remote_depth_job
 from app.jobs.store import Job, job_store
@@ -22,6 +22,7 @@ ALLOWED_SUFFIXES = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"}
 
 
 class ProcessingRequest(BaseModel):
+    preset: PresetName = "standard_depth"
     invert: bool = False
     temporal_smoothing: float = Field(default=0.25, ge=0, le=0.9)
     start_time: float = Field(default=0, ge=0)
@@ -29,6 +30,8 @@ class ProcessingRequest(BaseModel):
     output_width: int | None = Field(default=None, ge=128, le=1920)
     output_height: int | None = Field(default=None, ge=128, le=1920)
     output_fps: float | None = Field(default=None, ge=1, le=60)
+    max_output_side: int | None = Field(default=None, ge=128, le=1920)
+    max_output_fps: float | None = Field(default=None, ge=1, le=60)
     fit_mode: FitMode = "contain"
     export_png: bool = False
     create_package: bool = False
@@ -56,6 +59,7 @@ class RemoteJobRequest(ProcessingRequest):
 
 
 def _form_options(
+    preset: PresetName,
     invert: bool,
     temporal_smoothing: float,
     start_time: float,
@@ -63,6 +67,8 @@ def _form_options(
     output_width: int | None,
     output_height: int | None,
     output_fps: float | None,
+    max_output_side: int | None,
+    max_output_fps: float | None,
     fit_mode: FitMode,
     export_png: bool,
     create_package: bool,
@@ -71,6 +77,7 @@ def _form_options(
     scene_cut_threshold: float,
 ) -> ProcessingOptions:
     options = ProcessingOptions(
+        preset=preset,
         invert=invert,
         temporal_smoothing=temporal_smoothing,
         start_time=start_time,
@@ -78,6 +85,8 @@ def _form_options(
         output_width=output_width,
         output_height=output_height,
         output_fps=output_fps,
+        max_output_side=max_output_side,
+        max_output_fps=max_output_fps,
         fit_mode=fit_mode,
         export_png=export_png,
         create_package=create_package,
@@ -93,6 +102,7 @@ def _form_options(
 async def create_job(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    preset: PresetName = Form("standard_depth"),
     invert: bool = Form(False),
     temporal_smoothing: float = Form(0.25, ge=0, le=0.9),
     start_time: float = Form(0, ge=0),
@@ -100,6 +110,8 @@ async def create_job(
     output_width: int | None = Form(None, ge=128, le=1920),
     output_height: int | None = Form(None, ge=128, le=1920),
     output_fps: float | None = Form(None, ge=1, le=60),
+    max_output_side: int | None = Form(None, ge=128, le=1920),
+    max_output_fps: float | None = Form(None, ge=1, le=60),
     fit_mode: FitMode = Form("contain"),
     export_png: bool = Form(False),
     create_package: bool = Form(False),
@@ -108,8 +120,9 @@ async def create_job(
     scene_cut_threshold: float = Form(0.32, ge=0.05, le=1),
 ) -> dict:
     options = _form_options(
-        invert, temporal_smoothing, start_time, end_time, output_width,
-        output_height, output_fps, fit_mode, export_png, create_package,
+        preset, invert, temporal_smoothing, start_time, end_time, output_width,
+        output_height, output_fps, max_output_side, max_output_fps,
+        fit_mode, export_png, create_package,
         stabilize_range, scene_cut_reset, scene_cut_threshold,
     )
     filename = Path(file.filename or "video.mp4").name

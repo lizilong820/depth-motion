@@ -37,6 +37,50 @@ def test_default_options_preserve_source_shape_and_rate() -> None:
     assert output["frames"] == 300
 
 
+def test_preset_limits_preserve_landscape_and_portrait_ratios() -> None:
+    landscape = resolve_output(
+        probe(),
+        ProcessingOptions(preset="quick_preview", max_output_side=768, max_output_fps=12),
+    )
+    portrait_probe = VideoProbe(
+        width=1080, height=1920, fps=30, frames=300, duration=10,
+        codec="h264", has_audio=False,
+    )
+    portrait = resolve_output(
+        portrait_probe,
+        ProcessingOptions(preset="quick_preview", max_output_side=768, max_output_fps=12),
+    )
+    assert (landscape["width"], landscape["height"], landscape["fps"]) == (768, 432, 12)
+    assert (portrait["width"], portrait["height"], portrait["fps"]) == (432, 768, 12)
+
+
+def test_explicit_output_values_override_preset_limits() -> None:
+    output = resolve_output(
+        probe(),
+        ProcessingOptions(
+            preset="custom",
+            output_width=1280,
+            output_height=720,
+            output_fps=24,
+            max_output_side=512,
+            max_output_fps=8,
+        ),
+    )
+    assert (output["width"], output["height"], output["fps"]) == (1280, 720, 24)
+
+
+def test_preset_limits_do_not_upscale_or_raise_source_fps() -> None:
+    source = VideoProbe(
+        width=640, height=360, fps=10, frames=100, duration=10,
+        codec="h264", has_audio=False,
+    )
+    output = resolve_output(
+        source,
+        ProcessingOptions(max_output_side=1280, max_output_fps=24),
+    )
+    assert (output["width"], output["height"], output["fps"]) == (640, 360, 10)
+
+
 def test_output_options_resolve_clip_and_missing_dimension() -> None:
     options = ProcessingOptions(
         start_time=2,
@@ -56,6 +100,19 @@ def test_output_options_resolve_clip_and_missing_dimension() -> None:
 def test_invalid_time_range_is_rejected() -> None:
     with pytest.raises(InvalidUploadError):
         resolve_output(probe(), ProcessingOptions(start_time=11))
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ProcessingOptions(preset="invalid"),
+        ProcessingOptions(max_output_side=127),
+        ProcessingOptions(max_output_fps=61),
+    ],
+)
+def test_invalid_preset_options_are_rejected(options: ProcessingOptions) -> None:
+    with pytest.raises(InvalidUploadError):
+        resolve_output(probe(), options)
 
 
 def test_derived_dimension_stays_within_output_limit() -> None:
@@ -80,6 +137,19 @@ def test_scene_difference_detects_hard_cut() -> None:
     _, sample = _scene_difference(None, black)
     difference, _ = _scene_difference(sample, white)
     assert difference == pytest.approx(1.0)
+
+
+def test_processing_options_preserve_preset_metadata() -> None:
+    options = ProcessingOptions.from_dict({
+        "preset": "motion_character",
+        "max_output_side": 1024,
+        "max_output_fps": 24,
+        "unknown_future_field": True,
+    })
+    assert options.preset == "motion_character"
+    assert options.max_output_side == 1024
+    assert options.max_output_fps == 24
+    assert "unknown_future_field" not in options.public()
 
 
 def test_old_job_json_gets_new_defaults(tmp_path: Path) -> None:
@@ -160,6 +230,31 @@ def test_full_comfyui_package_pipeline(tmp_path: Path, monkeypatch: pytest.Monke
     assert probe_video(package_source).has_audio
     assert not (tmp_path / "source-normalized.mp4").exists()
     assert not (tmp_path / "depth-frames").exists()
+
+
+def test_job_reports_encoding_after_last_depth_frame(monkeypatch: pytest.MonkeyPatch) -> None:
+    job = job_store.create(filename="encoding.mp4", suffix=".mp4")
+    statuses = []
+    original_update = job_store.update
+
+    def track_update(job_id: str, **changes):
+        if "status" in changes:
+            statuses.append((changes["status"], changes.get("message")))
+        return original_update(job_id, **changes)
+
+    def fake_process(**kwargs):
+        kwargs["progress"](2, 2)
+        return {"frames": 2, "fps": 12, "width": 320, "height": 180}
+
+    try:
+        monkeypatch.setattr("app.jobs.service.process_depth_video", fake_process)
+        monkeypatch.setattr(job_store, "update", track_update)
+        _run_depth_job(job.id, release_slot=False)
+        assert ("encoding", "正在编码深度视频") in statuses
+        assert statuses[-1][0] == "completed"
+    finally:
+        job_store.delete(job.id)
+        shutil.rmtree(job.directory, ignore_errors=True)
 
 
 def test_failed_job_removes_partial_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:

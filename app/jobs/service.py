@@ -103,11 +103,18 @@ def _run_depth_job(job_id: str, release_slot: bool = True) -> None:
                 return
             last_reported = frame
             percent = 5 + int((frame / max(total, 1)) * 88)
+            finished_frames = frame >= total
             job_store.update(
                 job_id,
-                status="processing",
-                progress=min(percent, 93),
-                message=f"正在估计深度帧 {frame} / {total}",
+                status="encoding" if finished_frames else "processing",
+                progress=94 if finished_frames else min(percent, 93),
+                message=(
+                    "正在编码并打包 ComfyUI 素材"
+                    if finished_frames and options.create_package
+                    else "正在编码深度视频"
+                    if finished_frames
+                    else f"正在估计深度帧 {frame} / {total}"
+                ),
             )
 
         metadata = process_depth_video(

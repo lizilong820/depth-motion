@@ -39,6 +39,29 @@ def test_remote_job_rejects_invalid_time_range() -> None:
     assert response.status_code == 422
 
 
+def test_remote_job_rejects_invalid_preset_parameters() -> None:
+    invalid_payloads = [
+        {"preset": "unknown"},
+        {"max_output_side": 127},
+        {"max_output_fps": 61},
+    ]
+    for payload in invalid_payloads:
+        response = client.post(
+            "/api/jobs/remote",
+            json={"url": "https://example.com/video.mp4", **payload},
+        )
+        assert response.status_code == 422
+
+
+def test_upload_job_rejects_invalid_preset_parameters() -> None:
+    response = client.post(
+        "/api/jobs",
+        data={"preset": "quick_preview", "max_output_side": "127"},
+        files={"file": ("clip.mp4", b"not reached", "video/mp4")},
+    )
+    assert response.status_code == 422
+
+
 def test_completed_job_exposes_and_downloads_artifacts() -> None:
     job = job_store.create(filename="clip.mp4", suffix=".mp4")
     try:
