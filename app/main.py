@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.comfyui import router as comfyui_router
 from app.config import ROOT_DIR, settings
 from app.errors import AppError
 from app.jobs.router import router as jobs_router
@@ -20,6 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger("depth-studio")
 
 app = FastAPI(title="Depth Motion Studio", version="0.1.0")
+app.include_router(comfyui_router)
 app.include_router(jobs_router)
 
 

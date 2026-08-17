@@ -116,6 +116,7 @@
     .tech-list li { display: flex; justify-content: space-between; gap: 12px; min-height: 32px; align-items: center; border-bottom: 1px solid #2b2f2b; font-size: 11px; }
     .tech-list li:last-child { border-bottom: 0; }
     .tech-list span { color: var(--muted); }
+    .node-download { width: 100%; margin-top: 10px; text-decoration: none; font-size: 11px; }
     .stage { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(460px,1fr) auto; background-color: #0c0d0c; background-image: linear-gradient(#181a18 1px,transparent 1px),linear-gradient(90deg,#181a18 1px,transparent 1px); background-size: 24px 24px; }
     .viewer-wrap { min-height: 0; display: grid; place-items: center; padding: 28px; overflow: hidden; }
     .viewer-shell { width: min(100%,1180px); }
@@ -289,6 +290,8 @@
             <li><span>尺寸 / 帧率</span><strong>跟随原片</strong></li>
             <li><span>音频</span><strong>自动保留</strong></li>
           </ul>
+          <a class="btn node-download" href="/api/comfyui-node" download="comfyui_depth_motion.zip">下载 ComfyUI 节点</a>
+          <p class="hint">解压到 ComfyUI/custom_nodes，安装节点 requirements.txt 后重启 ComfyUI。</p>
         </section>
       </aside>
 

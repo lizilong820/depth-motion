@@ -1,5 +1,7 @@
+from io import BytesIO
 from pathlib import Path
 import shutil
+import zipfile
 
 from fastapi.testclient import TestClient
 
@@ -14,6 +16,22 @@ def test_health() -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_downloads_installable_comfyui_node_package() -> None:
+    response = client.get("/api/comfyui-node")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/zip")
+    assert "comfyui_depth_motion.zip" in response.headers["content-disposition"]
+    with zipfile.ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == [
+            "comfyui_depth_motion/__init__.py",
+            "comfyui_depth_motion/client.py",
+            "comfyui_depth_motion/nodes.py",
+            "comfyui_depth_motion/requirements.txt",
+            "comfyui_depth_motion/README.md",
+        ]
+        assert b"NODE_CLASS_MAPPINGS" in archive.read("comfyui_depth_motion/__init__.py")
 
 
 def test_rejects_non_video_upload() -> None:
