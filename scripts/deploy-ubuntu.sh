@@ -8,7 +8,9 @@ fi
 
 APP_DIR=${APP_DIR:-/opt/depth-motion}
 APP_USER=${APP_USER:-ubuntu}
-SERVER_NAME=${SERVER_NAME:-_}
+SERVER_NAME=${SERVER_NAME:-depth.whaios.com}
+ENABLE_HTTPS=${ENABLE_HTTPS:-1}
+CERTBOT_EMAIL=${CERTBOT_EMAIL:-}
 MODEL_ID=${MODEL_ID:-depth-anything/Depth-Anything-V2-Small-hf}
 MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-500}
 
@@ -25,7 +27,7 @@ APP_GROUP=$(id -gn "${APP_USER}")
 APP_HOME=$(getent passwd "${APP_USER}" | cut -d: -f6)
 
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl ffmpeg git libgl1 libglib2.0-0 nginx python3 python3-pip python3-venv
+apt-get install -y --no-install-recommends ca-certificates certbot curl ffmpeg git libgl1 libglib2.0-0 nginx python3 python3-certbot-nginx python3-pip python3-venv
 
 install -d -o "${APP_USER}" -g "${APP_GROUP}" /var/lib/depth-motion/jobs
 install -d -o "${APP_USER}" -g "${APP_GROUP}" /var/cache/depth-motion/huggingface
@@ -79,6 +81,18 @@ systemctl enable nginx depth-motion.service depth-motion-cleanup.timer
 systemctl restart depth-motion.service
 systemctl restart depth-motion-cleanup.timer
 systemctl reload-or-restart nginx
+
+if [[ ${ENABLE_HTTPS} == 1 && ${SERVER_NAME} != _ ]]; then
+    certbot_args=(
+        --nginx -d "${SERVER_NAME}" --non-interactive --agree-tos --redirect
+    )
+    if [[ -n ${CERTBOT_EMAIL} ]]; then
+        certbot_args+=(--email "${CERTBOT_EMAIL}")
+    else
+        certbot_args+=(--register-unsafely-without-email)
+    fi
+    certbot "${certbot_args[@]}"
+fi
 
 for _ in {1..30}; do
     if curl --fail --silent --show-error http://127.0.0.1:8000/health; then
